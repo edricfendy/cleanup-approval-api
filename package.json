@@ -1,0 +1,11 @@
+{
+  "name": "cleanup-approval-api",
+  "version": "1.0.0",
+  "description": "Email approval endpoint for GitHub Actions cleanup workflow",
+  "main": "api/approve-cleanup.js",
+  "type": "module",
+  "dependencies": {},
+  "engines": {
+    "node": ">=18.x"
+  }
+}
