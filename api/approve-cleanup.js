@@ -1,5 +1,4 @@
-// api/approve-cleanup.js
-// Deploy this to Vercel (free) to enable email-only approval
+import crypto from 'crypto';
 
 export default async function handler(req, res) {
   const { token, run_id } = req.query;
@@ -86,3 +85,4 @@ export default async function handler(req, res) {
     `);
   }
 }
+
