@@ -1,15 +1,9 @@
 {
   "version": 2,
-  "functions": {
-    "api/**/*.js": {
-      "memory": 128,
-      "maxDuration": 10
-    }
-  },
-  "env": {
-    "APPROVAL_SECRET": "@approval-secret",
-    "GITHUB_OWNER": "@github-owner",
-    "GITHUB_REPO": "@github-repo",
-    "GITHUB_TOKEN": "@github-token"
-  }
+  "builds": [
+    { "src": "api/approve-cleanup.js", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/api/approve-cleanup", "dest": "api/approve-cleanup.js" }
+  ]
 }
