@@ -1,11 +1,15 @@
 {
-  "name": "cleanup-approval-api",
-  "version": "1.0.0",
-  "description": "Email approval endpoint for GitHub Actions cleanup workflow",
-  "main": "api/approve-cleanup.js",
-  "type": "module",
-  "dependencies": {},
-  "engines": {
-    "node": ">=18.x"
+  "version": 2,
+  "functions": {
+    "api/**/*.js": {
+      "memory": 128,
+      "maxDuration": 10
+    }
+  },
+  "env": {
+    "APPROVAL_SECRET": "@approval-secret",
+    "GITHUB_OWNER": "@github-owner",
+    "GITHUB_REPO": "@github-repo",
+    "GITHUB_TOKEN": "@github-token"
   }
 }
