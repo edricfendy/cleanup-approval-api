@@ -2,14 +2,14 @@ import crypto from 'crypto';
 
 export default async function handler(req, res) {
   const { token, run_id } = req.query;
-  
+
   // Security: Verify the approval token
   const expectedToken = process.env.APPROVAL_SECRET;
-  const computedToken = require('crypto')
+  const computedToken = crypto
     .createHash('sha256')
     .update(`${run_id}-${expectedToken}`)
     .digest('hex');
-  
+
   if (token !== computedToken) {
     return res.status(403).send(`
       <!DOCTYPE html>
@@ -22,12 +22,12 @@ export default async function handler(req, res) {
       </html>
     `);
   }
-  
+
   // Trigger GitHub workflow via repository_dispatch
   const owner = process.env.GITHUB_OWNER; // e.g., 'edricfendy'
   const repo = process.env.GITHUB_REPO;   // e.g., 'Final'
   const githubToken = process.env.GITHUB_TOKEN; // Personal Access Token
-  
+
   try {
     const response = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/dispatches`,
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
         })
       }
     );
-    
+
     if (response.ok) {
       return res.status(200).send(`
         <!DOCTYPE html>
@@ -69,7 +69,7 @@ export default async function handler(req, res) {
     } else {
       throw new Error(`GitHub API error: ${response.status}`);
     }
-    
+
   } catch (error) {
     console.error('Error triggering workflow:', error);
     return res.status(500).send(`
@@ -85,4 +85,3 @@ export default async function handler(req, res) {
     `);
   }
 }
-
