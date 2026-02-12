@@ -1,8 +1,11 @@
 const crypto = require('crypto');
 const fetch = require('node-fetch');
 
+// In-memory store for used tokens (for production, use Redis or database)
+const usedTokens = new Map();
+
 module.exports = async (req, res) => {
-  const { token, run_id } = req.query;
+  const { token, run_id, expiry } = req.query;
   
   // Validate required parameters
   if (!token || !run_id) {
@@ -60,6 +63,186 @@ module.exports = async (req, res) => {
     `);
   }
   
+  // NEW FEATURE 3: Check if token has expired (7-day expiration)
+  if (expiry) {
+    const currentTime = Math.floor(Date.now() / 1000);
+    const expiryTime = parseInt(expiry);
+    
+    if (currentTime > expiryTime) {
+      const expiredDate = new Date(expiryTime * 1000).toLocaleString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZoneName: 'short'
+      });
+      
+      return res.status(403).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Token Expired</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+              background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+              min-height: 100vh;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              padding: 20px;
+            }
+            .container {
+              background: white;
+              border-radius: 16px;
+              box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+              padding: 60px 40px;
+              max-width: 500px;
+              text-align: center;
+            }
+            .icon {
+              font-size: 64px;
+              margin-bottom: 20px;
+            }
+            h1 {
+              color: #1f2937;
+              font-size: 28px;
+              margin-bottom: 15px;
+              font-weight: 600;
+            }
+            p {
+              color: #6b7280;
+              font-size: 16px;
+              line-height: 1.6;
+              margin-bottom: 10px;
+            }
+            .error-box {
+              background: #fef3c7;
+              border-left: 4px solid #f59e0b;
+              border-radius: 8px;
+              padding: 15px;
+              margin: 20px 0;
+              text-align: left;
+              font-size: 14px;
+              color: #78350f;
+            }
+            .help-list {
+              text-align: left;
+              margin: 15px 0;
+              padding-left: 20px;
+            }
+            .help-list li {
+              color: #6b7280;
+              margin: 8px 0;
+              font-size: 14px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="icon">⏰</div>
+            <h1>Token Expired</h1>
+            <p>This approval link has expired and can no longer be used.</p>
+            <div class="error-box">
+              <strong>Expiration Details:</strong><br>
+              Expired at: ${expiredDate}<br>
+              Current time: ${new Date().toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}
+            </div>
+            <p><strong>What to do:</strong></p>
+            <ul class="help-list">
+              <li>Wait for the next scheduled cleanup (Sunday 9 AM WIB)</li>
+              <li>Or manually trigger a new cleanup from GitHub Actions</li>
+            </ul>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+  }
+  
+  // NEW FEATURE 4: Check if token has been used before (prevent reuse)
+  const tokenKey = `${run_id}-${token}`;
+  if (usedTokens.has(tokenKey)) {
+    const usedAt = usedTokens.get(tokenKey);
+    
+    return res.status(403).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Token Already Used</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+          }
+          .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 60px 40px;
+            max-width: 500px;
+            text-align: center;
+          }
+          .icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+          }
+          h1 {
+            color: #1f2937;
+            font-size: 28px;
+            margin-bottom: 15px;
+            font-weight: 600;
+          }
+          p {
+            color: #6b7280;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 10px;
+          }
+          .error-box {
+            background: #fee2e2;
+            border-left: 4px solid #ef4444;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+            font-size: 14px;
+            color: #991b1b;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="icon">🔒</div>
+          <h1>Token Already Used</h1>
+          <p>This approval link has already been used and cannot be used again.</p>
+          <div class="error-box">
+            <strong>Usage Details:</strong><br>
+            First used at: ${usedAt}<br>
+            Run ID: ${run_id}
+          </div>
+          <p><strong>Security Notice:</strong></p>
+          <p>Each approval link can only be used once for security reasons. If you need to run cleanup again, please wait for the next scheduled run or manually trigger a new cleanup workflow.</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+  
+  // Validate token
   const expectedToken = process.env.APPROVAL_SECRET;
   
   const computedToken = crypto
@@ -140,6 +323,18 @@ module.exports = async (req, res) => {
     `);
   }
   
+  // NEW FEATURE 4: Mark token as used (prevent reuse)
+  usedTokens.set(tokenKey, new Date().toLocaleString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZoneName: 'short'
+  }));
+  
+  // Trigger GitHub Actions workflow
   try {
     const response = await fetch(
       `https://api.github.com/repos/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/dispatches`,
@@ -154,6 +349,8 @@ module.exports = async (req, res) => {
           event_type: 'approve-cleanup',
           client_payload: { 
             run_id, 
+            token,
+            expiry,
             approved_by: 'email', 
             timestamp: new Date().toISOString() 
           }
@@ -172,6 +369,18 @@ module.exports = async (req, res) => {
         minute: '2-digit',
         timeZoneName: 'short'
       });
+      
+      // Calculate time remaining until expiry (if provided)
+      let expiryInfo = '';
+      if (expiry) {
+        const expiryTime = parseInt(expiry);
+        const currentTime = Math.floor(Date.now() / 1000);
+        const hoursRemaining = Math.floor((expiryTime - currentTime) / 3600);
+        expiryInfo = `<div class="detail-item">
+          <span class="label">Token Expires In</span>
+          <span class="value">${hoursRemaining} hours</span>
+        </div>`;
+      }
       
       return res.status(200).send(`
         <!DOCTYPE html>
@@ -352,11 +561,12 @@ module.exports = async (req, res) => {
                 <span class="label">Approved By</span>
                 <span class="value">Email Link</span>
               </div>
+              ${expiryInfo}
             </div>
             
             <div class="info-box">
               <h3>📊 What's Happening Now?</h3>
-              <p>GitHub Actions is executing the cleanup script. This process typically takes 2-5 minutes depending on the database size. You'll receive a detailed email report when it's complete.</p>
+              <p>GitHub Actions is executing the cleanup script with a final verification step. This process typically takes 2-5 minutes depending on the database size. You'll receive a detailed email report when it's complete.</p>
             </div>
             
             <a href="https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/actions" class="github-link" target="_blank">
